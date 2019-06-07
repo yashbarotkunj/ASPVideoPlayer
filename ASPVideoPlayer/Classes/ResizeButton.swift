@@ -79,7 +79,7 @@ open class ResizeButton: UIButton {
 /*
  Internal class used for the resize animation on the ResizeButton.
  */
-internal class ResizeLayer: AnimatableLayer {
+internal class ResizeLayer: AnimateableLayer {
     open override func draw(in context: CGContext) {
         super.draw(in: context)
         

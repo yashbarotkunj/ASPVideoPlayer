@@ -9,25 +9,6 @@
 import UIKit
 import AVFoundation
 
-//TODO: Replace with a better implementation for event forwarding.
-@objc public protocol ASPVideoPlayerViewDelegate: class {
-    @objc optional func newVideo()
-    @objc optional func readyToPlayVideo()
-    @objc optional func startedVideo()
-    @objc optional func playingVideo(progress: Double)
-    @objc optional func pausedVideo()
-    @objc optional func finishedVideo()
-    @objc optional func stoppedVideo()
-    @objc optional func seekStarted()
-    @objc optional func seekEnded()
-    @objc optional func error(error: Error)
-
-    @objc optional func willShowControls()
-    @objc optional func didShowControls()
-    @objc optional func willHideControls()
-    @objc optional func didHideControls()
-}
-
 /**
  A video player implementation with basic functionality.
  */
@@ -53,17 +34,11 @@ import AVFoundation
          */
         let controlsInitiallyHidden: Bool
 
-        /**
-         Sets whether the video player should be paused when entering the background.
-         */
-        let allowBackgroundPlay: Bool
-
-        public init(videoGravity: ASPVideoPlayerView.PlayerContentMode = .aspectFit, shouldLoop: Bool = false, startPlayingWhenReady: Bool = false, controlsInitiallyHidden: Bool = false, allowBackgroundPlay: Bool = false) {
+        public init(videoGravity: ASPVideoPlayerView.PlayerContentMode = .aspectFit, shouldLoop: Bool = false, startPlayingWhenReady: Bool = false, controlsInitiallyHidden: Bool = false) {
             self.videoGravity = videoGravity
             self.shouldLoop = shouldLoop
             self.startPlayingWhenReady = startPlayingWhenReady
             self.controlsInitiallyHidden = controlsInitiallyHidden
-            self.allowBackgroundPlay = allowBackgroundPlay
         }
 
         public static func `default`() -> Configuration {
@@ -73,7 +48,7 @@ import AVFoundation
 
     // MARK: - Private Variables and Constants -
 
-    fileprivate var videoPlayerView: ASPVideoPlayerView!
+     var videoPlayerView: ASPVideoPlayerView!
 
     /**
      Work item used to hide the controls with a delay.
@@ -83,21 +58,10 @@ import AVFoundation
     // MARK: - Public Variables -
 
     /**
-     Sets the delegate to use for event handling on the video player.
-    */
-    public weak var delegate: ASPVideoPlayerViewDelegate? {
-        didSet {
-            //TODO: Replace with a better implementation for event forwarding.
-            videoPlayerView.delegate = delegate;
-        }
-    }
-
-    /**
      Sets the controls to use for the player. By default the controls are ASPVideoPlayerControls.
      */
     open var videoPlayerControls: ASPBasicControls! {
         didSet {
-            //Set the player view on the controls to register for events
             videoPlayerControls.videoPlayer = videoPlayerView
             updateControls(videoPlayerControls)
         }
@@ -214,20 +178,14 @@ import AVFoundation
     }
 
     internal func showControls() {
-        delegate?.willShowControls?()
         UIView.animate(withDuration: fadeDuration, animations: {
             self.videoPlayerControls.alpha = 1.0
-        }, completion: { finished in
-            self.delegate?.didShowControls?()
         })
     }
 
     @objc internal func hideControls() {
-        delegate?.willHideControls?()
         UIView.animate(withDuration: fadeDuration, animations: {
             self.videoPlayerControls.alpha = 0.0
-        }, completion: { finished in
-            self.delegate?.didHideControls?()
         })
     }
 
@@ -246,12 +204,12 @@ import AVFoundation
             guard let strongSelf = self else { return }
 
             if let videoURL = strongSelf.videoPlayerView.videoURL {
-                if let currentURLIndex = strongSelf.videoURLs.firstIndex(of: videoURL) {
+                if let currentURLIndex = strongSelf.videoURLs.index(of: videoURL) {
                     strongSelf.videoPlayerControls.nextButtonHidden = currentURLIndex == strongSelf.videoURLs.count - 1
                     strongSelf.videoPlayerControls.previousButtonHidden = currentURLIndex == 0
                 }
             } else if let videoAsset = strongSelf.videoPlayerView.videoAsset {
-                if let currentURLIndex = strongSelf.videoAssets.firstIndex(of: videoAsset) {
+                if let currentURLIndex = strongSelf.videoAssets.index(of: videoAsset) {
                     strongSelf.videoPlayerControls.nextButtonHidden = currentURLIndex == strongSelf.videoAssets.count - 1
                     strongSelf.videoPlayerControls.previousButtonHidden = currentURLIndex == 0
                 }
@@ -269,7 +227,7 @@ import AVFoundation
                         strongSelf.videoPlayerView.videoURL = strongSelf.videoURLs.first
                     }
                 } else {
-                    let currentURLIndex = strongSelf.videoURLs.firstIndex(of: videoURL)
+                    let currentURLIndex = strongSelf.videoURLs.index(of: videoURL)
                     let nextURL = strongSelf.videoURLs[currentURLIndex! + 1]
 
                     strongSelf.videoPlayerView.videoURL = nextURL
@@ -280,7 +238,7 @@ import AVFoundation
                         strongSelf.videoPlayerView.videoAsset = strongSelf.videoAssets.first
                     }
                 } else {
-                    let currentURLIndex = strongSelf.videoAssets.firstIndex(of: videoAsset)
+                    let currentURLIndex = strongSelf.videoAssets.index(of: videoAsset)
                     let nextAsset = strongSelf.videoAssets[currentURLIndex! + 1]
 
                     strongSelf.videoPlayerView.videoAsset = nextAsset
@@ -294,14 +252,14 @@ import AVFoundation
             guard let strongSelf = self else { return }
 
             if let videoURL = strongSelf.videoPlayerView.videoURL {
-                if let currentURLIndex = strongSelf.videoURLs.firstIndex(of: videoURL) {
+                if let currentURLIndex = strongSelf.videoURLs.index(of: videoURL) {
                     let newIndex = (currentURLIndex + 1) % strongSelf.videoURLs.count
                     let nextURL = strongSelf.videoURLs[newIndex]
 
                     strongSelf.videoPlayerView.videoURL = nextURL
                 }
             } else if let videoAsset = strongSelf.videoPlayerView.videoAsset {
-                if let currentURLIndex = strongSelf.videoAssets.firstIndex(of: videoAsset) {
+                if let currentURLIndex = strongSelf.videoAssets.index(of: videoAsset) {
                     let newIndex = (currentURLIndex + 1) % strongSelf.videoAssets.count
                     let nextAsset = strongSelf.videoAssets[newIndex]
 
@@ -316,14 +274,14 @@ import AVFoundation
             guard let strongSelf = self else { return }
 
             if let videoURL = strongSelf.videoPlayerView.videoURL {
-                if let currentURLIndex = strongSelf.videoURLs.firstIndex(of: videoURL) {
+                if let currentURLIndex = strongSelf.videoURLs.index(of: videoURL) {
                     let previousIndex = currentURLIndex > 0 ? currentURLIndex : strongSelf.videoURLs.count
                     let nextURL = strongSelf.videoURLs[previousIndex - 1]
 
                     strongSelf.videoPlayerView.videoURL = nextURL
                 }
             } else if let videoAsset = strongSelf.videoPlayerView.videoAsset {
-                if let currentURLIndex = strongSelf.videoAssets.firstIndex(of: videoAsset) {
+                if let currentURLIndex = strongSelf.videoAssets.index(of: videoAsset) {
                     let previousIndex = currentURLIndex > 0 ? currentURLIndex : strongSelf.videoAssets.count
                     let nextAsset = strongSelf.videoAssets[previousIndex - 1]
 
@@ -352,12 +310,6 @@ import AVFoundation
         }
     }
 
-    @objc fileprivate func applicationDidEnterBackground() {
-        if configuration.allowBackgroundPlay == false {
-            videoPlayerControls.pause()
-        }
-    }
-
     private func commonInit() {
         let tapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(ASPVideoPlayer.toggleControls))
         tapGestureRecognizer.delegate = self
@@ -370,9 +322,6 @@ import AVFoundation
         videoPlayerView.translatesAutoresizingMaskIntoConstraints = false
         videoPlayerControls.translatesAutoresizingMaskIntoConstraints = false
 
-        videoPlayerView.accessibilityIdentifier = "VideoPlayerView"
-        videoPlayerControls.accessibilityIdentifier = "VideoPlayerControls"
-
         videoPlayerControls.backgroundColor = UIColor.black.withAlphaComponent(0.15)
 
         updateControls(videoPlayerControls)
@@ -380,14 +329,12 @@ import AVFoundation
         addSubview(videoPlayerView)
         addSubview(videoPlayerControls)
 
-        NotificationCenter.default.addObserver(self, selector: #selector(ASPVideoPlayer.applicationDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
-
         setupLayout()
     }
 
     private func setupLayout() {
-        let viewsDictionary: [String: Any] = ["videoPlayerView":videoPlayerView as Any,
-                                              "videoPlayerControls":videoPlayerControls as Any]
+        let viewsDictionary: [String: Any] = ["videoPlayerView":videoPlayerView,
+                                              "videoPlayerControls":videoPlayerControls]
 
         var constraintsArray = [NSLayoutConstraint]()
 

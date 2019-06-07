@@ -14,9 +14,8 @@ import UIKit
 public protocol VideoPlayerControls {
     /**
      Reference to the video player.
-     Should be a weak reference to prevent retain cycles.
      */
-    var videoPlayer: ASPVideoPlayerView? {get set}
+    weak var videoPlayer: ASPVideoPlayerView? {get set}
 
     /**
      Starts the video playback.
@@ -50,6 +49,8 @@ public protocol VideoPlayerControls {
      - Parameter value: The new volume value.
      */
     func volume(_ value: Float)
+    
+    func deinitObservers()
 }
 
 /**
@@ -58,9 +59,8 @@ public protocol VideoPlayerControls {
 public protocol VideoPlayerSeekControls {
     /**
      Reference to the video player.
-     Should be a weak reference to prevent retain cycles.
      */
-    var videoPlayer: ASPVideoPlayerView? {get set}
+    weak var videoPlayer: ASPVideoPlayerView? {get set}
 
     /**
      Set the new position in the video playback.
@@ -95,6 +95,10 @@ public extension VideoPlayerControls {
 
     func stop() {
         videoPlayer?.stopVideo()
+    }
+    
+    func deinitObservers() {
+        videoPlayer?.deinitObservers()
     }
 
     func jumpForward(_ value: Double = 0.05) {
@@ -133,13 +137,23 @@ open class ASPBasicControls: UIView, VideoPlayerControls, VideoPlayerSeekControl
 
     open var nextButtonHidden: Bool = true
     open var previousButtonHidden: Bool = true
+    
+    open var playPauseButtonHidden: Bool = true
+    open var resizeButtonHidden: Bool = true
+    
+    
+    open var progressSliderHidden: Bool = true
+    open var progressLoaderHidden: Bool = true
+    
+    open var currentTimeLabelHidden: Bool = true
+    open var lengthLabelHidden: Bool = true
 }
 
 @IBDesignable final public class ASPVideoPlayerControls: ASPBasicControls {
     /**
      Reference to the video player. Can be set through the Interface Builder.
      */
-    @IBOutlet public override weak var videoPlayer: ASPVideoPlayerView? {
+    @IBOutlet open override weak var videoPlayer: ASPVideoPlayerView? {
         didSet {
             setupVideoPlayerView()
         }
@@ -148,7 +162,7 @@ open class ASPBasicControls: UIView, VideoPlayerControls, VideoPlayerSeekControl
     /**
      Sets the visibility of the next button.
      */
-    public override var nextButtonHidden: Bool {
+    open override var nextButtonHidden: Bool {
         set {
             nextButton.isHidden = newValue
         }
@@ -160,7 +174,7 @@ open class ASPBasicControls: UIView, VideoPlayerControls, VideoPlayerSeekControl
     /**
      Sets the visibility of the previous button.
      */
-    public override var previousButtonHidden: Bool {
+    open override var previousButtonHidden: Bool {
         set {
             previousButton.isHidden = newValue
         }
@@ -169,10 +183,88 @@ open class ASPBasicControls: UIView, VideoPlayerControls, VideoPlayerSeekControl
         }
     }
 
+    
+    
+    /**
+     Sets the visibility of the Play Pause button.
+     */
+    open override var playPauseButtonHidden: Bool {
+        set {
+            playPauseButton.isHidden = newValue
+        }
+        get {
+            return playPauseButton.isHidden
+        }
+    }
+    
+    /**
+     Sets the visibility of the Resize button.
+     */
+    open override var resizeButtonHidden: Bool {
+        set {
+            resizeButton.isHidden = newValue
+        }
+        get {
+            return resizeButton.isHidden
+        }
+    }
+    
+    
+    /**
+     Sets the visibility of the Progress Slider.
+     */
+    open override var progressSliderHidden: Bool {
+        set {
+            progressSlider.isHidden = newValue
+        }
+        get {
+            return progressSlider.isHidden
+        }
+    }
+    
+    
+    /**
+     Sets the visibility of the Progress Loader.
+     */
+    open override var progressLoaderHidden: Bool {
+        set {
+            progressLoader.isHidden = newValue
+        }
+        get {
+            return progressLoader.isHidden
+        }
+    }
+    
+    
+    /**
+     Sets the visibility of the Current Time Label.
+     */
+    open override var currentTimeLabelHidden: Bool {
+        set {
+            currentTimeLabel.isHidden = newValue
+        }
+        get {
+            return currentTimeLabel.isHidden
+        }
+    }
+
+    
+    /**
+     Sets the visibility of the Length Label.
+     */
+    open override var lengthLabelHidden: Bool {
+        set {
+            lengthLabel.isHidden = newValue
+        }
+        get {
+            return lengthLabel.isHidden
+        }
+    }
+    
     /**
      Sets the color of the controls.
      */
-    public override var tintColor: UIColor! {
+    open override var tintColor: UIColor! {
         didSet {
             playPauseButton.tintColor = tintColor
             nextButton.tintColor = tintColor
@@ -187,7 +279,7 @@ open class ASPBasicControls: UIView, VideoPlayerControls, VideoPlayerSeekControl
         }
     }
 
-    public override var didPressResizeButton: ((Bool) -> Void)? {
+    open override var didPressResizeButton: ((Bool) -> Void)? {
         didSet {
             resizeButtonWidthConstraint.isActive = didPressResizeButton != nil
             resizeButtonRightConstraint.isActive = didPressResizeButton != nil
@@ -237,6 +329,10 @@ open class ASPBasicControls: UIView, VideoPlayerControls, VideoPlayerSeekControl
         self.videoPlayer = videoPlayer
     }
 
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
     @objc internal func playButtonPressed() {
         if videoPlayer?.status == .playing {
             videoPlayer?.startPlayingWhenReady = false
@@ -275,6 +371,11 @@ open class ASPBasicControls: UIView, VideoPlayerControls, VideoPlayerSeekControl
     @objc internal func progressSliderChanged(slider: Scrubber) {
         seek(value: Double(slider.value))
         perform(#selector(setter: ASPVideoPlayerControls.isInteracting), with: false, afterDelay: 0.1)
+    }
+
+    @objc internal func applicationDidEnterBackground() {
+        playPauseButton.buttonState = .pause
+        pause()
     }
 
     private func setupVideoPlayerView() {
@@ -377,6 +478,8 @@ open class ASPBasicControls: UIView, VideoPlayerControls, VideoPlayerSeekControl
     }
 
     private func commonInit() {
+        NotificationCenter.default.addObserver(self, selector: #selector(ASPVideoPlayerControls.applicationDidEnterBackground), name: NSNotification.Name.UIApplicationDidEnterBackground, object: nil)
+
         playPauseButton.translatesAutoresizingMaskIntoConstraints = false
         progressSlider.translatesAutoresizingMaskIntoConstraints = false
         nextButton.translatesAutoresizingMaskIntoConstraints = false
@@ -385,15 +488,6 @@ open class ASPBasicControls: UIView, VideoPlayerControls, VideoPlayerSeekControl
         currentTimeLabel.translatesAutoresizingMaskIntoConstraints = false
         lengthLabel.translatesAutoresizingMaskIntoConstraints = false
         resizeButton.translatesAutoresizingMaskIntoConstraints = false
-
-        playPauseButton.accessibilityIdentifier = "PlayPauseButton"
-        progressSlider.accessibilityIdentifier = "Scrubber"
-        nextButton.accessibilityIdentifier = "NextButton"
-        previousButton.accessibilityIdentifier = "PreviousButton"
-        progressLoader.accessibilityIdentifier = "ProgressLoader"
-        currentTimeLabel.accessibilityIdentifier = "CurrentTimeLabel"
-        lengthLabel.accessibilityIdentifier = "TotalTimeLabel"
-        resizeButton.accessibilityIdentifier = "ResizeButton"
 
         previousButton.isHidden = true
         nextButton.isHidden = true

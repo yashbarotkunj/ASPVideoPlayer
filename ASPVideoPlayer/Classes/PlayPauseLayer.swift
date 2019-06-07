@@ -11,7 +11,7 @@ import UIKit
 /*
  Internal class used for the play/pause animation on the PlayButton.
  */
-internal class PlayPauseLayer: AnimatableLayer {
+internal class PlayPauseLayer: AnimateableLayer {
     open override func draw(in context: CGContext) {
         super.draw(in: context)
 
@@ -44,7 +44,7 @@ internal class PlayPauseLayer: AnimatableLayer {
 /*
  Internal class used for creating layers with animations.
  */
-internal class AnimatableLayer: CALayer {
+internal class AnimateableLayer: CALayer {
     @NSManaged public var animationDirection: CGFloat
     @NSManaged public var color: UIColor
 
@@ -61,7 +61,7 @@ internal class AnimatableLayer: CALayer {
     public override init(layer: Any) {
         super.init(layer: layer)
 
-        if let layer = layer as? AnimatableLayer {
+        if let layer = layer as? PlayPauseLayer {
             animationDirection = layer.animationDirection
             color = layer.color
         }
@@ -76,7 +76,7 @@ internal class AnimatableLayer: CALayer {
             let basicAnimation = CABasicAnimation(keyPath: event)
             basicAnimation.fromValue = animationDirection
             basicAnimation.toValue = 1.0 - animationDirection
-            basicAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            basicAnimation.timingFunction = CAMediaTimingFunction(name: kCAMediaTimingFunctionEaseOut)
             basicAnimation.duration = 0.25
 
             return basicAnimation

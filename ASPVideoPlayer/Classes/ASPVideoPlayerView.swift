@@ -103,52 +103,52 @@ import AVFoundation
     /**
      A closure that will be called when a new video is loaded.
      */
-    open var newVideo: VoidClosure = nil
+    open var newVideo: VoidClosure
 
     /**
      A closure that will be called when the video is ready to play.
      */
-    open var readyToPlayVideo: VoidClosure = nil
+    open var readyToPlayVideo: VoidClosure
 
     /**
      A closure that will be called when a video is started.
      */
-    open var startedVideo: VoidClosure = nil
+    open var startedVideo: VoidClosure
 
     /**
      A closure that will be called repeatedly while the video is playing.
      */
-    open var playingVideo: ProgressClosure = nil
+    open var playingVideo: ProgressClosure
 
     /**
      A closure that will be called when a video is paused.
      */
-    open var pausedVideo: VoidClosure = nil
+    open var pausedVideo: VoidClosure
 
     /**
      A closure that will be called when the end of the video has been reached.
      */
-    open var finishedVideo: VoidClosure = nil
+    open var finishedVideo: VoidClosure
 
     /**
      A closure that will be called when a video is stopped.
      */
-    open var stoppedVideo: VoidClosure = nil
+    open var stoppedVideo: VoidClosure
 
     /**
      A closure that will be called when a seek is triggered.
      */
-    open var seekStarted: VoidClosure = nil
+    open var seekStarted: VoidClosure
 
     /**
      A closure that will be called when a seek has ended.
      */
-    open var seekEnded: VoidClosure = nil
+    open var seekEnded: VoidClosure
 
     /**
      A closure that will be called when an error occured.
      */
-    open var error: ErrorClosure = nil
+    open var error: ErrorClosure
 
     // MARK: - Public Variables -
 
@@ -186,8 +186,6 @@ import AVFoundation
                 let videoError = NSError(domain: "com.andreisergiupitis.aspvideoplayer", code: 99, userInfo: userInfo)
 
                 error?(videoError)
-
-                delegate?.error?(error: videoError)
                 return
             }
 
@@ -208,8 +206,6 @@ import AVFoundation
                 let videoError = NSError(domain: "com.andreisergiupitis.aspvideoplayer", code: 99, userInfo: userInfo)
                 
                 error?(videoError)
-                
-                delegate?.error?(error: videoError)
                 return
             }
 
@@ -250,10 +246,10 @@ import AVFoundation
     open var volume: Float {
         set {
             let value = min(1.0, max(0.0, newValue))
-            player.volume = value
+            videoPlayerLayer.player?.volume = value
         }
         get {
-            return player.volume
+            return videoPlayerLayer.player?.volume ?? 0.0
         }
     }
 
@@ -261,7 +257,7 @@ import AVFoundation
      The current playback time in seconds.
      */
     open var currentTime: Double {
-        if let time = player.currentItem?.currentTime() {
+        if let time = videoPlayerLayer.player?.currentItem?.currentTime() {
             return time.seconds
         }
 
@@ -272,7 +268,7 @@ import AVFoundation
      The length of the video in seconds.
      */
     open var videoLength: Double {
-        if let duration = player.currentItem?.asset.duration {
+        if let duration = videoPlayerLayer.player?.currentItem?.asset.duration {
             return duration.seconds
         }
 
@@ -284,16 +280,12 @@ import AVFoundation
     // MARK: - Private Variables and Constants -
 
     private let videoPlayerLayer: AVPlayerLayer = AVPlayerLayer()
-    private let player = AVPlayer()
 
     private var animationForwarder: AnimationForwarder!
 
     private var videoGravity: AVLayerVideoGravity! = AVLayerVideoGravity.resizeAspectFill
 
     private var timeObserver: AnyObject?
-
-    //TODO: Replace the delegate with a better implementation for event registration
-    internal weak var delegate: ASPVideoPlayerViewDelegate?
 
     // MARK: - Superclass methods -
 
@@ -326,7 +318,6 @@ import AVFoundation
     }
 
     deinit {
-        NotificationCenter.default.removeObserver(self)
         deinitObservers()
     }
 
@@ -336,18 +327,17 @@ import AVFoundation
      Starts the video player from the beginning.
      */
     @objc open func playVideo() {
-        guard let playerItem = player.currentItem else { return }
+        guard let playerItem = videoPlayerLayer.player?.currentItem else { return }
 
         if progress >= 1.0 {
             seekToZero()
         }
 
         status = .playing
-        player.rate = preferredRate
+        videoPlayerLayer.player?.rate = preferredRate
         startedVideo?()
-        delegate?.startedVideo?()
 
-        NotificationCenter.default.removeObserver(self, name: NSNotification.Name.AVPlayerItemDidPlayToEndTime, object: nil)
+        NotificationCenter.default.removeObserver(self)
         NotificationCenter.default.addObserver(self, selector: #selector(itemDidFinishPlaying(_:)) , name: NSNotification.Name.AVPlayerItemDidPlayToEndTime, object: playerItem)
     }
 
@@ -355,23 +345,19 @@ import AVFoundation
      Pauses the video.
      */
     open func pauseVideo() {
-        player.rate = 0.0
+        videoPlayerLayer.player?.rate = 0.0
         status = .paused
         pausedVideo?()
-
-        delegate?.pausedVideo?()
     }
 
     /**
      Stops the video.
      */
     open func stopVideo() {
-        player.rate = 0.0
+        videoPlayerLayer.player?.rate = 0.0
         seekToZero()
         status = .stopped
         stoppedVideo?()
-
-        delegate?.stoppedVideo?()
     }
 
     /**
@@ -379,27 +365,21 @@ import AVFoundation
      */
     open func seek(_ percentage: Double) {
         progress = min(1.0, max(0.0, percentage))
-        guard let currentItem = player.currentItem else { return }
+        guard let currentItem = videoPlayerLayer.player?.currentItem else { return }
 
         if progress == 0.0 {
             seekToZero()
             playingVideo?(progress)
-
-            delegate?.playingVideo?(progress: progress)
         } else {
             let time = CMTime(seconds: progress * currentItem.asset.duration.seconds, preferredTimescale: currentItem.asset.duration.timescale)
-            player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero, completionHandler: { [weak self] (finished) in
+            videoPlayerLayer.player?.seek(to: time, toleranceBefore: kCMTimeZero, toleranceAfter: kCMTimeZero, completionHandler: { [weak self] (finished) in
                 guard let strongSelf = self else { return }
 
                 if finished == false {
                     strongSelf.seekStarted?()
-                    strongSelf.delegate?.seekStarted?()
                 } else {
                     strongSelf.seekEnded?()
                     strongSelf.playingVideo?(strongSelf.progress)
-
-                    strongSelf.delegate?.seekEnded?()
-                    strongSelf.delegate?.playingVideo?(progress: strongSelf.progress)
                 }
             })
         }
@@ -410,7 +390,7 @@ import AVFoundation
     open override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
         guard let asset = object as? AVPlayerItem, let keyPath = keyPath else { return }
 
-        if asset == player.currentItem && keyPath == "status" {
+        if asset == videoPlayerLayer.player?.currentItem && keyPath == "status" {
             if asset.status == .readyToPlay {
                 if status == .new {
                     status = .readyToPlay
@@ -421,8 +401,6 @@ import AVFoundation
                     playVideo()
                 } else {
                     readyToPlayVideo?()
-
-                    delegate?.readyToPlayVideo?()
                 }
             } else if asset.status == .failed {
                 status = .error
@@ -431,8 +409,6 @@ import AVFoundation
                 let videoError = NSError(domain: "com.andreisergiupitis.aspvideoplayer", code: 99, userInfo: userInfo)
 
                 error?(videoError)
-
-                delegate?.error?(error: videoError)
             }
         }
     }
@@ -444,80 +420,62 @@ import AVFoundation
 
         deinitObservers()
 
-        player.replaceCurrentItem(with: playerItem)
+        videoPlayerLayer.player?.replaceCurrentItem(with: playerItem)
         videoPlayerLayer.videoGravity = videoGravity
 
-        player.currentItem?.addObserver(self, forKeyPath: "status", options: [], context: nil)
+        videoPlayerLayer.player?.currentItem?.addObserver(self, forKeyPath: "status", options: [], context: nil)
 
         status = .new
         newVideo?()
-
-        delegate?.newVideo?()
     }
 
     private func commonInit() {
-        videoPlayerLayer.player = player
+        videoPlayerLayer.player = AVPlayer()
         videoPlayerLayer.contentsScale = UIScreen.main.scale
-
-        NotificationCenter.default.addObserver(self, selector: #selector(ASPVideoPlayerView.applicationDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(ASPVideoPlayerView.applicationWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
     }
 
     fileprivate func seekToZero() {
         progress = 0.0
         let time = CMTime(seconds: 0.0, preferredTimescale: 1)
-        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        videoPlayerLayer.player?.seek(to: time, toleranceBefore: kCMTimeZero, toleranceAfter: kCMTimeZero)
     }
 
     fileprivate func addTimeObserver() {
         if let observer = timeObserver {
-            player.removeTimeObserver(observer)
+            videoPlayerLayer.player?.removeTimeObserver(observer)
         }
 
-        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.01, preferredTimescale: Int32(NSEC_PER_SEC)), queue: nil, using: { [weak self] (time) in
+        timeObserver = videoPlayerLayer.player?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.01, preferredTimescale: Int32(NSEC_PER_SEC)), queue: nil, using: { [weak self] (time) in
             guard let strongSelf = self, strongSelf.status == .playing else { return }
 
             let currentTime = time.seconds
             strongSelf.progress = currentTime / (strongSelf.videoLength != 0.0 ? strongSelf.videoLength : 1.0)
 
             strongSelf.playingVideo?(strongSelf.progress)
-
-            strongSelf.delegate?.playingVideo?(progress: strongSelf.progress)
         }) as AnyObject?
     }
 
-    fileprivate func deinitObservers() {
-        NotificationCenter.default.removeObserver(self, name: NSNotification.Name.AVPlayerItemDidPlayToEndTime, object: nil)
-        if let video = player.currentItem, video.observationInfo != nil {
+    func deinitObservers() {
+        NotificationCenter.default.removeObserver(self)
+        if let video = videoPlayerLayer.player?.currentItem, video.observationInfo != nil {
             video.removeObserver(self, forKeyPath: "status")
         }
         
         if let observer = timeObserver {
-            player.removeTimeObserver(observer)
+            videoPlayerLayer.player?.removeTimeObserver(observer)
             timeObserver = nil
         }
     }
 
-    @objc fileprivate func applicationDidEnterBackground() {
-        videoPlayerLayer.player = nil
-    }
-
-    @objc fileprivate func applicationWillEnterForeground() {
-        videoPlayerLayer.player = player
-    }
-
     @objc internal func itemDidFinishPlaying(_ notification: Notification) {
-        let currentItem = player.currentItem
+        let currentItem = videoPlayerLayer.player?.currentItem
         let notificationObject = notification.object as? AVPlayerItem
 
         finishedVideo?()
-
-        delegate?.finishedVideo?()
-
         if currentItem == notificationObject && shouldLoop == true {
             status = .playing
             seekToZero()
-            player.rate = preferredRate
+            videoPlayerLayer.player?.rate = preferredRate
         } else {
             stopVideo()
         }
